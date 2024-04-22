@@ -1,0 +1,117 @@
+---
+title: "HW10_SDS315"
+output: html_document
+date: "2024-04-20"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen=999)
+library(dplyr)
+library(tidyverse)
+library(mosaic)
+library(ggplot2)
+library(MatchIt)
+library(effectsize)
+library(kableExtra)
+library(moderndive)
+```
+# HW 10
+
+Name: Madeline Boss
+
+EID: mrb5727
+
+To see the code visit [Github](https://github.com/MadelineRBoss/HW10_SDS315)
+
+## Probelm 1: Redlining
+```{r 1_setup, include=FALSE}
+redlining_data <- read_csv("redlining.csv")
+```
+
+**Question**: Is there an association with the proportion of FAIR policies in a ZIP code area and the racial/ethnic makeup of a ZIP code area?
+
+**Approach**: Using a linear model, the relationship between FAIR polices per 100 residents (policies) and percentage of minority residents (minority) will be created. Afterwards, the fires per 100 units (fire), percentage of houses built before World War II (age), and median income (income) will be adjusted in the model.
+
+```{r 1_lm, echo=FALSE}
+redline_lm <- lm(policies ~ minority + fire + age + income, redlining_data)
+
+kable_classic_2(kbl(get_regression_table(redline_lm)))
+```
+**Result**: When variables fire, age, and income are held constant, the percentage of minority residents has a 0.008 effect on FAIR policies per 100 units. The range of true effect with 95% confidence is 0.003-0.014. Since minority has a p-value 0.006, which is under 0.05, minority has a statistically significant relationship with policies.
+
+**Conclusion**: Since the relationship between percentage of minority residents and FAIR policies per 100 is significant, minority percentage do cause changes in fair policies per 100 residents. Since the value (0.008) is positive, it can be concluded that more minority residents lead to more residents getting FAIR policies. In other words, minority residents are less likely to be able to get private insurance. 
+
+## Probelm 2: Grocery Store Prices
+```{r 2_setup, include=FALSE}
+grocery_data <- read_csv("groceries.csv")
+grocery_data <- mutate(grocery_data, Grocery_Unique_Name = ifelse((Store == "H-E-B") |(Store == "Whole Foods"), paste(Store, Neighborhood), Store))
+```
+
+### Part A
+```{r 2A, echo=FALSE}
+grocery_store_data <- grocery_data %>%
+  group_by(Grocery_Unique_Name) %>%
+  summarise(avg_price = mean(Price))
+
+ggplot(grocery_store_data) + geom_bar(aes(x = factor(Grocery_Unique_Name), y = avg_price), stat = "identity") + coord_flip() + labs(y = "Average Price", x = "Store", title = "Average Price Among Stores")
+```
+
+### Part B
+```{r 2B, echo = FALSE}
+grocery_Product_data <- grocery_data %>%
+  group_by(Product) %>%
+  summarise(num_stores = length(unique(Grocery_Unique_Name)))
+
+ggplot(grocery_Product_data) + geom_bar(aes(x = Product, y=num_stores), stat = "identity") + labs(title = "Number of Stores that Sell a Product", x = "Product", y = "Number of Stores") + coord_flip()
+```
+
+### Part C
+```{r 2C, include = FALSE}
+grocery_Type_lm <- lm(Price ~ Product + Type, grocery_data)
+
+get_regression_table(grocery_Type_lm)
+```
+Compared with ordinary grocery stores (like Albertsons, HEB, or Krogers), convenience stores charge somewhere between 0.43 and 0.92 dollars more for the same product.”
+
+### Part D
+```{r 2D, echo = FALSE}
+grocery_Store_lm <- lm(Price ~ Product + Grocery_Unique_Name, grocery_data)
+
+grocery_Store_lm_table <- get_regression_table(grocery_Store_lm)
+```
+
+The two cheapest stores when selling the same item are Kroger Fresh Fare and Walmart.
+
+The two priciest stores when selling the same item are Wheatsville Food Co-Op and Whole Foods Tarrytown.
+
+### Part E
+```{r 2E, include = FALSE}
+HEB_diff_dataset <- mutate(grocery_Store_lm_table, HEB_diff = estimate - -0.646)
+HEB_diff_dataset <- HEB_diff_dataset[c(41:53),]
+
+count = 0
+for(store in c(1:nrow(HEB_diff_dataset))){
+  if(abs(HEB_diff_dataset$HEB_diff[store]) > 0.073){
+    count = count + 1
+  }}
+```
+
+
+The HEB in this data set has an estimated coefficient of -0.646 with it's 95% confidence interval being -0.945 to -0.347. Central Market on the other hand has an estimated coefficient of -0.573 with its 95% confidence interval being -0.922 to -0.225. The difference in it's estimates is 0.073. This may seem a lot, but `r count` stores have a higher difference in prices with HEB compared to Central Market. Since their 95% confidence intervals overlap, and over majority of stores have a higher price difference, we can conclude Central Market charges a similar amount to HEB for the same product.
+
+### Part F
+```{r 2F, include=FALSE}
+grocery_data <- mutate(grocery_data, Income10K = Income/10000)
+
+grocery_Income_lm <- lm(Price ~ Product + Income10K, grocery_data)
+
+get_regression_table(grocery_Income_lm)
+standardize_parameters(grocery_Income_lm)
+```
+
+Based on the coefficient for Income10K, -0.014, consumers in poorer ZIP codes seem to pay less on average. This is because the coefficent is negative.
+
+A one-standard deviation increase in the income of a ZIP code seems to be associated with
+a -0.03 standard-deviation change in the price that consumers in that ZIP code expect to pay for
+the same product.
